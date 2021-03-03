@@ -2,32 +2,10 @@ const express = require("express");
 const morgan = require("morgan");
 const cors = require("cors");
 
+require("dotenv").config();
+const Person = require("./models/persons");
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-let persons = 
-[
-    {
-        id: 1,
-        name: "Toni Pekkala",
-        number: "040-123132"
-    },
-    {
-        id: 2,
-        name: "Apina Mies",
-        number: "101-090909"
-    },
-    {
-        id: 3,
-        name: "Vitun Mulukku",
-        number: "898-202020"
-    },
-    {
-        id: 4,
-        name: "Möö Möö",
-        number: "848-098098"
-    },
-]
 
 app.use(express.json())
 app.use(express.static("build"));
@@ -51,69 +29,85 @@ app.use(morgan(function (tokens, req, res) {
 
 
 
-const generateId = () => {
-    const randomId = Math.floor(Math.random() * 10000 + 1)
-    return randomId;
-}
+// const generateId = () => {
+//     const randomId = Math.floor(Math.random() * 10000 + 1)
+//     return randomId;
+// }
+
+const errorHandler = (error, req, res, next) => {
+    console.error(error.message);
+
+    if (error.name === "CastError") {
+      return res.status(400).send({ error: "malformed id" })
+    }
+    next(error)
+  }
 
 
 app.get("/", (req, res) => {
     res.status(202).send("Toimii")
 });
 
-app.get("/api/persons", (req, res) => {
-    res.json(persons)
-    console.log(persons)
-})
+app.get("/api/persons", (req, res, next) => {
+    Person.find({}).then(persons => {
+        res.json(persons.map(person => person.toJSON()));
+    })
+    .catch(error => next(error))
+});
 
-app.get("/api/persons/:id", (req, res) => {
-    const id = Number(req.params.id);
-    const person = persons.find(person => person.id === id);
-    if (person) {
-        res.json(person)
-    } else {
-        console.log("ei löydy")
-        res.status(404).end()
-    }
-})
+app.get("/api/persons/:id", (req, res, next) => {
+    Person.findById(req.params.id).then(person => {
+        res.json(person.toJSON());
+    })
+    .catch(error => next(error))
+});
 
-app.get("/info", (req, res) => {
-    const amountOfPersons = persons.length;
+
+
+app.get("/info", async (req, res) => {
+    const amountOfPersons = await Person.find().count();
     const date = new Date()
     console.log(`${amountOfPersons} persons`)
     res.send(`<p>Phonebook has ${amountOfPersons} people.</p> <p>${date}</p>`)
 })
 
-app.post("/api/persons", (req, res) => {
+app.post("/api/persons", (req, res, next) => {
+    const body = req.body
+    const person = new Person({
+        name: body.name,
+        number: body.number,
+    })
     
-    const newPerson = {
-        id: generateId(),
-        name: req.body.name,
-        number: req.body.number,
+    person.save().then(savedPerson => {
+        res.json(savedPerson.toJSON())
+    })
+    .catch(error => next(error));
+})
+
+app.put("/api/persons/:id", (req, res, next) => {
+    const body = req.body;
+    const person = {
+        name: body.name,
+        number: body.number,
     };
-    const personName = persons.some(person => person.name === newPerson.name)
 
-    if(req.body.number && personName !== true) {
-        persons = persons.concat(newPerson)
-        res.json(newPerson)
-
-    } else {
-        return res.status(400).json({
-            error: "name must be unique or number missing"
+    Person.findByIdAndUpdate(req.params.id, person, { new: true })
+        .then(updatedPerson => {
+            res.json(updatedPerson)
         })
-    }
-    
+        .catch(error => next(error));
+});
+
+app.delete("/api/persons/:id", (req, res, next) => {
+    Person.findByIdAndDelete(req.params.id)
+        .then(result => {
+            res.status(204).end();
+        })
+        .catch(error => next(error)) 
 })
 
-app.delete("/api/persons/:id", (req, res) => {
-    const id = Number(req.params.id)
-    const person = persons.find(person => person.id === id);
-    if(person) {
-        res.status(204).end();
-    } else {
-        res.status(404).end();
-    }
-})
+app.use(errorHandler)
+
 
 app.listen(PORT)
 console.log(`Server is running on ${PORT}`);
