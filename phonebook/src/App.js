@@ -91,7 +91,17 @@ function App() {
             setMessage("")
           }, 5000)
       })
-      .catch(error => console.log(error))
+      .catch(error => {
+        console.error(error.response.data)
+        if(newName.length < 3) {
+          setMessage(`Name must be atleast 3 characters long`)
+        } else if (newNumber.length < 8) {
+          setMessage(`Number must be atleast 8 characters long`)
+        }
+        setTimeout(() => {
+          setMessage("")
+        }, 5000)
+      })
       }
       
     } else {

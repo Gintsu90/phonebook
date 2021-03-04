@@ -3,7 +3,6 @@ const Notification = ({message}) => {
     //     return null
     // }
     const messageStyle = {
-        color: "green",
         border: "solid",
         background: "lightgrey",
         fontSize: 20,
